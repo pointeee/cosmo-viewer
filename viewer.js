@@ -48,25 +48,32 @@ document.getElementById("fileInput").addEventListener("change", e => {
     );
 
 const material = new THREE.ShaderMaterial({
-  transparent: false,
-  depthWrite: true,
-  uniforms: {},
+  uniforms: {
+    uSize: { value: 0.5 },
+    uPixelRatio: { value: window.devicePixelRatio }
+  },
   vertexShader: `
+    uniform float uSize;
+    uniform float uPixelRatio;
+
     void main() {
-      gl_PointSize = 0.1;
-      gl_Position = projectionMatrix *
-                    modelViewMatrix *
-                    vec4(position, 1.0);
+      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+      gl_Position = projectionMatrix * mvPosition;
+
+      // size in screen pixels
+      gl_PointSize = uSize * uPixelRatio;
     }
   `,
   fragmentShader: `
     void main() {
       vec2 c = gl_PointCoord - vec2(0.5);
-      if (dot(c, c) > 0.25) discard;
+      if (length(c) > 0.5) discard;
       gl_FragColor = vec4(1.0);
     }
-  `
+  `,
+  transparent: true
 });
+
 
 
     if (points) scene.remove(points);
