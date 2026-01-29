@@ -12,7 +12,7 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   10000
 );
-camera.position.set(0, 0, 5);
+camera.position.set(0, 0, 1000);
 
 // ---------- Renderer ----------
 const renderer = new THREE.WebGLRenderer({ antialias: false });
@@ -22,6 +22,10 @@ document.body.appendChild(renderer.domElement);
 
 // ---------- Controls ----------
 const controls = new PointerLockControls(camera, renderer.domElement);
+const dir = new THREE.Vector3(0, 0, -1).normalize();
+const yaw   = Math.atan2(dir.x, -dir.z);
+const pitch = Math.asin(dir.y);
+controls.getObject().rotation.set(pitch, yaw, 0);
 renderer.domElement.addEventListener("click", () => controls.lock());
 
 const keys = {};
@@ -30,33 +34,40 @@ document.addEventListener("keyup",   e => keys[e.code] = false);
 
 // ---------- Particle container ----------
 let points = null;
+let positions = null;
+let colors = null;
 
-// ---------- Load local particle file ----------
-document.getElementById("fileInput").addEventListener("change", e => {
-  const file = e.target.files[0];
-  if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const buf = ev.target.result;
-    const positions = new Float32Array(buf);
+// ---------- UI components ----------
+const slider = document.getElementById('sizeSlider');
+slider.addEventListener('input', () => {
+  material.uniforms.uSize.value = parseFloat(slider.value);
+});
 
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new THREE.BufferAttribute(positions, 3)
-    );
+const resetPositionBtn = document.getElementById('resetPositionBtn');
+resetPositionBtn.addEventListener('click', () => {
+  camera.position.set(0, 0, 0);
+});
 
-const material = new THREE.ShaderMaterial({
+const resetViewBtn = document.getElementById('resetViewBtn');
+resetViewBtn.addEventListener('click', () => {
+controls.getObject().rotation.set(0, 0, 0);
+});
+
+// ---------- Particle Material ----------
+let material = new THREE.ShaderMaterial({
   uniforms: {
     uSize: { value: 0.5 },
     uPixelRatio: { value: window.devicePixelRatio }
   },
+  vertexColors: true,
   vertexShader: `
     uniform float uSize;
     uniform float uPixelRatio;
+    varying vec3 vColor;
 
     void main() {
+      vColor = color;
       vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
       gl_Position = projectionMatrix * mvPosition;
 
@@ -65,22 +76,77 @@ const material = new THREE.ShaderMaterial({
     }
   `,
   fragmentShader: `
+    varying vec3 vColor;
+    
     void main() {
       vec2 c = gl_PointCoord - vec2(0.5);
-      if (length(c) > 0.5) discard;
-      gl_FragColor = vec4(1.0);
-    }
+      if (dot(c, c) > 0.25) discard;
+    
+      gl_FragColor = vec4(vColor, 1.0);
+}
   `,
   transparent: true
 });
 
+// ---------- Load particle file ----------
+document.getElementById("fileInput").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
 
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const buf = ev.target.result;
+    positions = new Float32Array(buf);
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(positions, 3)
+    );
 
     if (points) scene.remove(points);
     points = new THREE.Points(geometry, material);
     scene.add(points);
 
     console.log(`Loaded ${positions.length / 3} particles`);
+
+  };
+
+  reader.readAsArrayBuffer(file);
+});
+
+// ---------- Load color file ----------
+document.getElementById("fileColorInput").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = ev => {
+
+    if (!positions) return;
+
+    const buf = ev.target.result;
+    const colors = new Float32Array(buf);
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(positions, 3)
+    );
+
+    if (colors.length === positions.length) {
+    geometry.setAttribute(
+      "color",
+      new THREE.BufferAttribute(colors, 3)
+    );
+    }
+
+    if (points) scene.remove(points);
+    points = new THREE.Points(geometry, material);
+    scene.add(points);
+
+    console.log(`Loaded ${positions.length / 3} particles with colors`);
+
   };
 
   reader.readAsArrayBuffer(file);
@@ -115,6 +181,10 @@ function animate() {
 
 }
 
+function setupUI() {
+
+}
+
 animate();
 
 // ---------- Resize ----------
@@ -123,3 +193,36 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+// ---------- Demo Data ----------
+window.addEventListener('DOMContentLoaded', () => {
+  loadDemo();
+});
+
+async function loadDemo() {
+  var res = await fetch("data/DESI_BGS.bin");
+  var buf = await res.arrayBuffer();
+  positions = new Float32Array(buf);
+
+  var res = await fetch("data/DESI_BGS_false_color.bin");
+  var buf = await res.arrayBuffer();
+  colors = new Float32Array(buf);
+
+  const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(positions, 3)
+    );
+
+    if (colors.length === positions.length) {
+    geometry.setAttribute(
+      "color",
+      new THREE.BufferAttribute(colors, 3)
+    );
+    }
+
+    if (points) scene.remove(points);
+    points = new THREE.Points(geometry, material);
+    scene.add(points);
+
+}
