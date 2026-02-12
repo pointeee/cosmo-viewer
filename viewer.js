@@ -54,6 +54,11 @@ resetViewBtn.addEventListener('click', () => {
 controls.getObject().rotation.set(0, 0, 0);
 });
 
+const bgPicker = document.getElementById("bgPicker");
+bgPicker.addEventListener("input", () => {
+  scene.background = new THREE.Color(bgPicker.value);
+});
+
 // ---------- Particle Material ----------
 let material = new THREE.ShaderMaterial({
   uniforms: {
