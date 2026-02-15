@@ -32,6 +32,12 @@ const keys = {};
 document.addEventListener("keydown", e => keys[e.code] = true);
 document.addEventListener("keyup",   e => keys[e.code] = false);
 
+// ---------- Camera Axes Helper ----------
+const cameraAxes = new THREE.AxesHelper(2);
+controls.getObject().add(cameraAxes);
+cameraAxes.position.set(0, 0, -5);
+scene.add(camera)
+
 // ---------- Particle container ----------
 let points = null;
 let positions = null;
@@ -102,6 +108,17 @@ document.getElementById("fileInput").addEventListener("change", e => {
   reader.onload = ev => {
     const buf = ev.target.result;
     positions = new Float32Array(buf);
+
+    for (let i = 0; i < positions.length; i += 3) {
+    const x = positions[i];
+    const y = positions[i + 1];
+    const z = positions[i + 2];
+  
+    positions[i]     = x;
+    positions[i + 1] = z;
+    positions[i + 2] = -y;
+}
+
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
@@ -183,6 +200,8 @@ function animate() {
   camera.position.y += direction.y * speed * dt;
 
   renderer.render(scene, camera);
+  cameraAxes.quaternion.copy(camera.quaternion.clone().invert());
+
 
 }
 
